@@ -22,7 +22,7 @@ _colcon_prefix_chain_bash_source_script() {
 COLCON_CURRENT_PREFIX="/opt/ros/humble"
 _colcon_prefix_chain_bash_source_script "$COLCON_CURRENT_PREFIX/local_setup.bash"
 # setting COLCON_CURRENT_PREFIX avoids determining the prefix in the sourced script
-COLCON_CURRENT_PREFIX="/workspaces/DockerExample/Radar_alliance V1.0/radar_remap_cpp/install"
+COLCON_CURRENT_PREFIX="/workspaces/TransferStation/1_Projects/Current/Alliance-radar-dev/Radar_alliance V1.0/radar_remap_cpp/install"
 _colcon_prefix_chain_bash_source_script "$COLCON_CURRENT_PREFIX/local_setup.bash"
 
 # source this prefix

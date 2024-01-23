@@ -1,5 +1,4 @@
 # !/usr/bin/env python3
-
 try:
     # [ROS2]
     import rclpy
@@ -13,6 +12,7 @@ try:
     import array
     import time
     import cv2 as cv
+    import logging
 
 
     # [YOLOv5]
@@ -54,7 +54,6 @@ class PointsPublisher(Node):
         msg = Float32MultiArray()
         msg.data = points
         self.command_publisher_.publish(msg) 
-        print("\033c>\033[33m[WORKING]\033[0m[正在发送点坐标]\033[?25l\n"+str(msg.data))
 # [坐标数据发送类]<
 
 # [测试图像接收类]>
@@ -123,8 +122,8 @@ def run(
         if is_url and is_file:
             source = check_file(source)  # download
     except Exception as e:
-        print(">\033[31m[ERROR]\033[0m[摄像头/视频加载失败，请检查文件路径是否正确]")
-        print(">\033[31m[ERROR]\033[0m[错误信息]" + str(e) + "\n")
+        logging.error("[ERROR][摄像头/视频加载失败，请检查文件路径是否正确]")
+        logging.error("[ERROR][错误信息]" + str(e) + "\n")
     # [载入输入图像/视频流]<
 
     # [载入模型]>
@@ -141,8 +140,8 @@ def run(
         armor_names = ["armor_1_red","armor_2_red","armor_3_red","armor_4_red","armor_5_red","watcher_red","armor_1_blue","armor_2_blue","armor_3_blue","armor_4_blue","armor_5_blue","watcher_blue"]
         # [Armor model load]<
     except Exception as e:
-        print(">\033[31m[ERROR]\033[0m[模型加载失败，请检查文件路径是否正确]")
-        print(">\033[31m[ERROR]\033[0m[错误信息]" + str(e) + "\n")
+        logging.error("[ERROR][模型加载失败，请检查文件路径是否正确]")
+        logging.error("[ERROR][错误信息]" + str(e) + "\n")
     # [载入模型]<
 
     # [载入数据]>
@@ -158,8 +157,8 @@ def run(
             dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
         vid_path, vid_writer = [None] * bs, [None] * bs
     except Exception as e:
-        print(">\033[31m[ERROR]\033[0m[数据加载失败]")
-        print(">\033[31m[ERROR]\033[0m[错误信息]" + str(e) + "\n")
+        logging.error("[ERROR][数据加载失败]")
+        logging.error("[ERROR][错误信息]" + str(e) + "\n")
     # [载入数据]<
 
 
@@ -204,8 +203,8 @@ def run(
                 imc = im0.copy() if identfy_car else im0  # for identfy_car
                 annotator = Annotator(im0, line_width=line_thickness, example=str(names))
                 pointslist = []
+
                 if len(det):
-                    
                     # Rescale boxes from img_size to im0 size
                     det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
@@ -213,9 +212,9 @@ def run(
                     for c in det[:, 5].unique():
                         n = (det[:, 5] == c).sum()  # detections per class
                         s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-
                     # Write results
                     for *xyxy, conf, cls in reversed(det):
+                        
                         c = int(cls)  # integer class
                         label = names[c] if hide_conf else f'{names[c]}'
                         confidence = float(conf)
@@ -316,15 +315,14 @@ def run(
                                                 pointslist.append(center_x)
                                                 pointslist.append(xyxy[3])
                             except Exception as e:
-                                print(">\033[31m[ERROR]\033[0m[装甲板识别过程运行错误]")
-                                print(">\033[31m[ERROR]\033[0m[错误信息]" + str(e) + "\n")
+                                logging.error("[ERROR][装甲板识别过程运行错误]")
+                                logging.error("[ERROR][错误信息]" + str(e) + "\n")
                             # [model2:装甲板识别网络]<<<<<<
-
+                    
                     # [填装数据]>
                     points = array.array('f',pointslist)
                     PointsPublisher_obj.send_points(points)
                     # [填装数据]<
-
                 # [计算帧率]
                 end_time = time.time()
                 process_time = end_time - start_time
@@ -338,21 +336,21 @@ def run(
                         cv2.namedWindow(str(p),0)  # allow window resize (Linux)
                         cv2.resizeWindow(str(p), 800, 500)
 
-                    print("\033[32m>[识别结果数量]\033[0m" + str(len(pointslist)/3) 
-                        + "\n\033[32m>[每一帧用时]\033[0m" + str(round(process_time*1000))+"ms"
-                        + "\n\033[32m>[FPS]\033[0m" + str(FPS))
+                    logging.info("[识别结果数量]" + str(len(pointslist)/3) 
+                        + "[每一帧用时]" + str(round(process_time*1000))+"ms"
+                        + "[FPS]" + str(FPS))
 
                     cv2.imshow(str(p), im0)
                     cv2.waitKey(1)  # 1 millisecond
         except Exception as e:
-            print(">\033[31m[ERROR]\033[0m[模型识别过程运行错误]")
-            print(">\033[31m[ERROR]\033[0m[错误信息]" + str(e) + "\n")
+            logging.error("[ERROR][模型识别过程运行错误]")
+            logging.error("[ERROR][错误信息]" + str(e) + "\n")
             continue
         
 
     # [识别效果总结]
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
-    LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
+    # LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
 
     if update:
         strip_optimizer(car_weights[0])  # update model (to fix SourceChangeWarning)
@@ -361,22 +359,23 @@ def run(
 
 
 def main(args=None):
-    # [提示信息界面]>
-    print("\033[1m[正在启动神经网络识别节点]\033[0m")
-    print(">\033[33m[WORKING]\033[0m[初始化rclpy]")
-    rclpy.init(args=args) # 初始化rclpy
-    node = PointsPublisher("points_publisher")  # 新建一个节点
+    LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+    logging.basicConfig(filename=os.getcwd()+'/logs/py.log', level=logging.DEBUG, format=LOG_FORMAT)
 
+    rclpy.init(args=args) # 初始化rclpy
+
+    # [提示信息界面]>
+    logging.info("[正在启动神经网络识别节点]")
+    logging.info("[初始化rclpy]")
+    
+    node = PointsPublisher("points_publisher")  # 新建一个节点
 
     # image_subscriber = ImageSubscriber("image_subscriber")
     # rclpy.spin(image_subscriber)
 
-
-
-    print(">\033[32m[DONE]\033[0m[初始化完成]")
-    print(">\033[32m[DONE]\033[0m[节点启动]")
-    print(">\033[33m[WORKING]\033[0m[正在启动YOLOv5]")
-    # [提示信息界面]<
+    logging.info("[初始化完成]")
+    logging.info("[节点启动]")
+    logging.info("[正在启动YOLOv5]")
 
     try:
         run(node,
@@ -386,10 +385,9 @@ def main(args=None):
             view_img=True,
             identfy_car=True)
     except Exception as e:
-        print(">\033[31m[ERROR]\033[0m[运行错误，请检查文件路径是否正确或环境是否存在问题]")
-        print(">\033[31m[ERROR]\033[0m[错误信息]" + str(e) + "\n")
+        logging.fatal("[运行错误，请检查文件路径是否正确或环境是否存在问题]")
+        logging.fatal("[错误信息]" + str(e))
 
     # [保持节点运行，检测是否收到退出指令(Ctrl+C)]
     rclpy.spin(node)
     rclpy.shutdown()
-   

@@ -5,6 +5,9 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
+#include <string>
+#include <fstream>
+#include <time.h>
 
 using namespace std;
 using namespace cv;
@@ -38,6 +41,113 @@ std::vector<string> armor_names = { "1", "2", "3", "4", "5",
 // [定义存储map (机器人标签,机器人坐标)]>
 std::map<int, cv::Point2f> cars_position;
 // [定义存储map (机器人标签,机器人坐标)]<
+
+
+// [日志实现]>
+class Logger
+{
+public:
+    enum log_level { debug, info, warning, error };// 日志等级
+    enum log_target { file, terminal, file_and_terminal };// 日志输出目标
+public:
+    Logger();
+    Logger(log_target target, log_level level, const std::string& path);
+    ~Logger();
+    
+    void DEBUG(const std::string& text);
+    void INFO(const std::string& text);
+    void WARNING(const std::string& text);
+    void ERRORS(const std::string& text);
+
+private:
+    std::ofstream m_outfile;    // 将日志输出到文件的流对象
+    log_target m_target;        // 日志输出目标
+    std::string m_path;              // 日志文件路径
+    log_level m_level;          // 日志等级
+    void output(const std::string &text, log_level act_level);            // 输出行为
+};
+std::string currTime()
+{
+    // 获取当前时间，并规范表示
+    char tmp[64];
+    time_t ptime;
+    time(&ptime);  // time_t time (time_t* timer);
+    strftime(tmp, sizeof(tmp), "%Y-%m-%d %H:%M:%S", localtime(&ptime));
+    return tmp;
+}
+Logger::Logger()
+{
+    // 默认构造函数
+    m_target = terminal;
+    m_level = debug;
+}
+Logger::Logger(log_target target, log_level level, const std::string& path)
+{
+    m_target = target;
+    m_path = path;
+    m_level = level;
+
+    std::string strContent = "[" + currTime() + "]" + "<开始日志>\n";
+    if (target != terminal) {
+        m_outfile.open(path, std::ios::out | std::ios::app);   // 打开输出文件
+        m_outfile << strContent;
+    }
+    if (target != file) 
+    {
+        // 如果日志对象不是仅文件
+        std::cout << strContent;
+    }
+}
+Logger::~Logger()
+{
+    std::string  strContent = "[" + currTime() + "]" + "<结束日志>\n";
+    if (m_outfile.is_open())
+    {
+        m_outfile << strContent;
+    }
+    m_outfile.flush();
+    m_outfile.close();
+}
+void Logger::DEBUG(const std::string& text)
+{
+    output(text, debug);
+}
+void Logger::INFO(const std::string& text)
+{
+    output(text, info);
+}
+void Logger::WARNING(const std::string& text)
+{
+    output(text, warning);
+}
+void Logger::ERRORS(const std::string& text)
+{
+    output(text, error);
+}
+void Logger::output(const std::string &text, log_level act_level)
+{
+    std::string prefix;
+    if (act_level == debug) prefix = "[DEBUG] ";
+    else if (act_level == info) prefix = "[INFO] ";
+    else if (act_level == warning) prefix = "[WARNING] ";
+    else if (act_level == error) prefix = "[ERROR] ";
+    //else prefix = "";
+    //prefix += __FILE__;
+    //prefix += " ";
+    std::string outputContent = prefix + currTime() + " : " + text + "\n";
+    if (m_level <= act_level && m_target != file) 
+    {
+        // 当前等级设定的等级才会显示在终端，且不能是只文件模式
+        std::cout << outputContent;
+    }
+    if (m_target != terminal)
+        m_outfile << outputContent;
+
+    m_outfile.flush();//刷新缓冲区
+}
+// [日志实现]<
+Logger logger(Logger::file,Logger::debug,"./logs/cpp.log");
+
 
 // [透视变换函数]>
 void remap(std::map<int, cv::Point2f> cars_position)
@@ -104,11 +214,13 @@ void remap(std::map<int, cv::Point2f> cars_position)
         imshow("1", temp_image);
         waitKey(1);
     } catch (const std::exception& e) {
-        cout << "\033[31m[ERROR]\033[0m";
-        std::cerr << e.what() << '\n';
+        string errors = "[ERROR]";
+        errors.append(e.what());
+        logger.ERRORS(errors);
     }
 }
 // [透视变换函数]<
+
 
 // [ROS2 数据收发类]>
 class Points_subscriber : public rclcpp::Node {
@@ -116,8 +228,6 @@ public:
     Points_subscriber(std::string name)
         : Node(name)
     {
-        cout << ">\033[32m[DONE]\033[0m[节点启动]\n>\033[34m[WAITING]\033[0m\033[5m[等待数据]\033[0m" << endl;
-
         // [创建订阅]
         command_subscribe_ = this->create_subscription<std_msgs::msg::Float32MultiArray>("points_data", 10, std::bind(&Points_subscriber::command_callback, this, std::placeholders::_1));
     }
@@ -128,9 +238,9 @@ private:
     void command_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
     {
         try {
-            cout << "\033c>\033[33m[WORKING]\033[0m[正在接收点坐标]\033[?25l" << endl;
+            logger.INFO("[正在接收点坐标]");
             if (msg->data.size() == 0) {
-                cout << "\033[31m[ERROR]\033[0m[未识别到坐标]" << endl;
+                logger.WARNING("[WARNING][未识别到坐标]");
             } else {
                 // [装填数据至 map<int, cv::Point2f> cars_position]>
                 for (int i = 0; i < msg->data.size() - 2; i += 3) {
@@ -143,51 +253,55 @@ private:
                 // [装填数据至 map<int, cv::Point2f> cars_position]<
 
                 // [输出信息]>
-                for (int i = 0; i < cars_position.size(); i++) {
-                    if (i == 0) {
-                        cout << "\033[31m[RED]\n";
-                    } else if (i == 6) {
-                        cout << "\033[0m\033[34m[BLUE]\n";
-                    }
-                    cout << armor_names[i];
-                    if (cars_position[i].x == 0.0 && cars_position[i].y == 0.0) {
-                        printf(":[未识别到]\n");
-                    } else {
-                        printf(":(%0.1f,%0.1f)\n", cars_position[i].x, cars_position[i].y);
-                    }
-                }
-                cout << "\033[0m\n"
-                     << endl;
+                // for (int i = 0; i < cars_position.size(); i++) {
+                //     if (i == 0) {
+                //         cout << "\033[31m[RED]\n";
+                //     } else if (i == 6) {
+                //         cout << "\033[0m\033[34m[BLUE]\n";
+                //     }
+                //     cout << armor_names[i];
+                //     if (cars_position[i].x == 0.0 && cars_position[i].y == 0.0) {
+                //         printf(":[未识别到]\n");
+                //     } else {
+                //         printf(":(%0.1f,%0.1f)\n", cars_position[i].x, cars_position[i].y);
+                //     }
+                // }
+                // cout << "\033[0m\n"
+                //      << endl;
                 // [输出信息]<
 
                 // [透视变换]
                 remap(cars_position);
             }
         } catch (const std::exception& e) {
-            cout << "\033[31m[ERROR]\033[0m";
-            std::cerr << e.what() << '\n';
+            string errors = "[ERROR]";
+            errors.append(e.what());
+            logger.ERRORS(errors);
         }
     }
     // [收到话题数据的回调函数]<
 };
 // [ROS2 数据收发类]<
 
+
 int main(int argc, char** argv)
 {
-    cout << "\033[1m[正在启动小地图映射节点]\033[0m" << endl;
-    cout << ">\033[33m[WORKING]\033[0m[初始化|读取地图和高地数据]" << endl;
-    cout << ">\033[32m[DONE]\033[0m[读取结束]" << endl;
+    
+
+    logger.INFO("[正在启动小地图映射节点]");
+    logger.INFO("[初始化|读取地图和高地数据]");
+    logger.INFO("[读取结束]");
 
     // [读取相机标定矩阵]>
     try {
         string filename = "./Datas/martixs.yaml";
-        cout << ">\033[33m[WORKING]\033[0m[读取相机标定矩阵]" << endl;
+        logger.INFO("[读取相机标定矩阵]");
 
         // [以读取的模式打开相机标定文件]
         FileStorage fread(filename, FileStorage::READ);
         // [判断是否打开成功]
         if (!fread.isOpened()) {
-            cout << ">\033[31m[ERROR]\033[0m[打开文件失败，请确认文件名称是否正确]" << endl;
+            logger.ERRORS("[ERROR][打开文件失败，请确认文件名称是否正确]");
             return -1;
         }
 
@@ -197,10 +311,11 @@ int main(int argc, char** argv)
 
         fread.release();
 
-        cout << ">\033[32m[DONE]\033[0m[读取结束]" << endl;
+        logger.INFO("[读取结束]");
     } catch (const std::exception& e) {
-        cout << "\033[31m[ERROR]\033[0m";
-        std::cerr << e.what() << '\n';
+        string errors = "[ERROR]";
+        errors.append(e.what());
+        logger.ERRORS(errors);
     }
 
     // [读取相机标定矩阵]<
@@ -213,7 +328,7 @@ int main(int argc, char** argv)
     resizeWindow("1", Size(800, 500));
 
     // [初始化节点]
-    cout << ">\033[33m[WORKING]\033[0m[启动节点]" << endl;
+    logger.INFO("[启动完成]");
     rclcpp::init(argc, argv);
 
     // [创建对应节点的共享指针对象]
