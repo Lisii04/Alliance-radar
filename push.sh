@@ -6,4 +6,4 @@ then
 else
     git commit -m "Update in "$(date +%F)" "$(date +%R)
 fi
-git push origin main
+git push --progress origin main
