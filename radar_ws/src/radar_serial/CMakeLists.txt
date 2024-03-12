@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(serial REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -22,3 +23,10 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+add_executable(radar_serial src/radar_serial.cpp)
+ament_target_dependencies(radar_serial rclcpp serial)
+
+install(TARGETS
+  radar_serial
+  DESTINATION lib/${PROJECT_NAME}
+)
