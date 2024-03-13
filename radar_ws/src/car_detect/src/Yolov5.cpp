@@ -136,7 +136,7 @@ public:
 	Points_publisher(std::string name)
 		: Node(name)
 	{
-		std::string topic = "car_detect";
+		std::string topic = "detect_result";
 
 		// [创建订阅]
 		publisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(topic, 10);
@@ -161,17 +161,14 @@ int main(int argc, char **argv)
 	//[运行节点，并检测退出信号]
 
 	std_msgs::msg::Float32MultiArray message;
-
-	publisher->publish(message);
-
 	std::string classNames[1] = {"Car"};
 
 	std::shared_ptr<YOLOv5Detector> detector(new YOLOv5Detector());
 
 	auto capture = cv::VideoCapture();
 
-	detector->load_model("./car_identfy.onnx", 640, 640, 0.25f);
-	capture.open("./2.mp4");
+	detector->load_model("./resources/car_identfy.onnx", 640, 640, 0.25f);
+	capture.open("./resources/2.mp4");
 
 	if (!capture.isOpened())
 	{
@@ -183,14 +180,24 @@ int main(int argc, char **argv)
 
 	cv::namedWindow("detect_window", 0);
 	cv::resizeWindow("detect_window", cv::Size(960, 540));
-	cv::namedWindow("car_images", 0);
-	cv::resizeWindow("car_images", cv::Size(100, 100));
+	// cv::namedWindow("car_images", 0);
+	// cv::resizeWindow("car_images", cv::Size(100, 100));
 	while (true)
 	{
 		bool ret = capture.read(frame);
 		if (!ret)
 			break;
 		detector->detect(frame, results);
+
+		std::vector<float> detect_result(results.size() * 3);
+		for (size_t i = 0; i < results.size(); i++)
+		{
+			detect_result.push_back(results[i].classId);
+			detect_result.push_back(results[i].box.x);
+			detect_result.push_back(results[i].box.y);
+		}
+		message.data = detect_result;
+		publisher->publish(message);
 		for (DetectResult dr : results)
 		{
 			std::ostringstream info;
