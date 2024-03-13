@@ -22,7 +22,7 @@ using map_robot_data_t = struct
 // 串口初始化
 serial::Serial radar_serial = serial::Serial("/dev/ttyUSB0",
                                              115200U,
-                                             serial::Timeout(),
+                                             serial::Timeout::simpleTimeout(50U),
                                              serial::eightbits,
                                              serial::parity_none,
                                              serial::stopbits_one,
@@ -131,7 +131,7 @@ public:
     // 构造函数
     PositionsSubscriber(std::string name) : Node(name)
     {
-        position_subscribe_ = this->create_subscription<std_msgs::msg::Float32MultiArray>("detect_result", 10, std::bind(&PositionsSubscriber::command_callback, this, std::placeholders::_1));
+        position_subscribe_ = this->create_subscription<std_msgs::msg::Float32MultiArray>("car_positions", 10, std::bind(&PositionsSubscriber::command_callback, this, std::placeholders::_1));
     }
 
 private:

@@ -177,6 +177,7 @@ int main(int argc, char **argv)
 
 	cv::Mat frame;
 	std::vector<DetectResult> results;
+	std::vector<float> detect_result;
 
 	cv::namedWindow("detect_window", 0);
 	cv::resizeWindow("detect_window", cv::Size(960, 540));
@@ -188,8 +189,8 @@ int main(int argc, char **argv)
 		if (!ret)
 			break;
 		detector->detect(frame, results);
+		detect_result.clear();
 
-		std::vector<float> detect_result(results.size() * 3);
 		for (size_t i = 0; i < results.size(); i++)
 		{
 			detect_result.push_back(results[i].classId);
